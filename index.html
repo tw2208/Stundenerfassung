@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Stundenerfassung</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#f4f5f7;color:#222}
+.app{max-width:900px;margin:0 auto}
+h1{margin-top:0}.card{background:#fff;border:1px solid #ddd;border-radius:14px;padding:18px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.full{grid-column:1/-1}
+label{display:block;font-size:14px;font-weight:bold;margin-bottom:6px}
+input,select{width:100%;min-height:46px;padding:10px;border:1px solid #bbb;border-radius:9px;font-size:16px;background:#fff}
+button{min-height:46px;padding:10px 16px;border:0;border-radius:9px;font-size:15px;font-weight:bold;cursor:pointer}
+.primary{width:100%;background:#1d6fdc;color:#fff}.secondary{background:#e9edf2;color:#222}
+.edit{background:#e8eef7;color:#174d91;font-size:13px}.delete{background:#eee;color:#a00000;font-size:13px}
+.cancel{display:none;width:100%;margin-top:8px;background:#ddd}.calculation{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.big{font-size:30px;font-weight:bold}.pause{background:#eee;padding:10px;border-radius:8px}.hint,#message{color:#666;font-size:13px}
+#message{min-height:20px;margin:8px 0}.editNotice{display:none;padding:10px;margin-bottom:15px;border-radius:8px;background:#fff4cc;font-size:14px;font-weight:bold}
+.month-head{display:flex;align-items:end;justify-content:space-between;gap:15px;flex-wrap:wrap}.control{min-width:150px}
+.sort-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid #ddd}.sort-row .control{flex:1;min-width:180px}
+.table-wrap{overflow-x:auto;margin-top:18px}table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}th{background:#f0f1f3}
+td.time,th.time{text-align:right}tfoot td{font-weight:bold;background:#f5f5f5}.actions{display:flex;gap:5px}
+#empty{text-align:center;color:#777;padding:25px}
+@media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}.full{grid-column:auto}.calculation{align-items:flex-start;flex-direction:column}.control,.secondary{width:100%}.sort-row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Stundenerfassung</h1>
+<div class="card">
+<div id="editNotice" class="editNotice">Eintrag wird bearbeitet</div>
+<div class="grid">
+<div class="full"><label for="date">Datum</label><input id="date" type="date"></div>
+<div class="full"><label for="customer">Kunde</label><input id="customer" type="text" placeholder="Name / Baustelle" autocomplete="off"></div>
+<div><label for="start">Beginn</label><input id="start" type="time"></div>
+<div><label for="end">Ende</label><input id="end" type="time"></div>
+</div></div>
+<div class="card"><div class="calculation"><div><div class="hint">Arbeitszeit</div><div id="total" class="big">0:00 Std.</div></div><div id="breakDisplay" class="pause">Pause: 0 Min.</div></div>
+<p class="hint">Über 6 Stunden: automatisch 30 Minuten Pause. Über 9 Stunden: automatisch 45 Minuten Pause.</p></div>
+<div id="message"></div>
+<button id="save" class="primary" type="button">Eintrag speichern</button>
+<button id="cancelEdit" class="cancel" type="button">Bearbeiten abbrechen</button>
+<div class="card" style="margin-top:25px">
+<div class="month-head"><div class="control"><label for="month">Monatsübersicht</label><input id="month" type="month"></div>
+<button id="pdf" class="secondary" type="button">PDF exportieren</button></div>
+<div class="sort-row">
+<div class="control"><label for="sortBy">Sortieren nach</label><select id="sortBy"><option value="date">Datum</option><option value="start">Beginn</option><option value="customer">Kunde</option></select></div>
+<div class="control"><label for="sortDirection">Reihenfolge</label><select id="sortDirection"><option value="asc">Aufsteigend</option><option value="desc">Absteigend</option></select></div>
+</div>
+<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="time">Arbeitszeit</th><th>Aktion</th></tr></thead>
+<tbody id="tableBody"></tbody><tfoot><tr><td colspan="5">Monatssumme</td><td id="monthTotal" class="time">0:00 Std.</td><td></td></tr></tfoot></table></div>
+<div id="empty">Für diesen Monat sind noch keine Zeiten erfasst.</div>
+</div></div>
+<script>
+const STORAGE_KEY="allroundWeberStunden",SORT_STORAGE_KEY="allroundWeberStundenSortierung";
+const $=id=>document.getElementById(id),dateInput=$("date"),customerInput=$("customer"),startInput=$("start"),endInput=$("end"),totalDisplay=$("total"),breakDisplay=$("breakDisplay"),saveButton=$("save"),cancelEditButton=$("cancelEdit"),editNotice=$("editNotice"),monthInput=$("month"),pdfButton=$("pdf"),tableBody=$("tableBody"),monthTotal=$("monthTotal"),emptyDisplay=$("empty"),message=$("message"),sortBy=$("sortBy"),sortDirection=$("sortDirection");
+let editingId=null;
+function loadEntries(){try{const s=localStorage.getItem(STORAGE_KEY);if(!s)return[];const p=JSON.parse(s);return Array.isArray(p)?p:[]}catch(e){console.error(e);return[]}}
+let entries=loadEntries();
+function saveEntries(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(entries));return true}catch(e){message.textContent="Die Daten konnten nicht gespeichert werden.";return false}}
+function saveSortSettings(){try{localStorage.setItem(SORT_STORAGE_KEY,JSON.stringify({sortBy:sortBy.value,direction:sortDirection.value}))}catch(e){}}
+function loadSortSettings(){try{const s=localStorage.getItem(SORT_STORAGE_KEY);if(!s)return;const x=JSON.parse(s);if(["date","start","customer"].includes(x.sortBy))sortBy.value=x.sortBy;if(["asc","desc"].includes(x.direction))sortDirection.value=x.direction}catch(e){}}
+const now=new Date(),cy=now.getFullYear(),cm=String(now.getMonth()+1).padStart(2,"0"),cd=String(now.getDate()).padStart(2,"0"),today=`${cy}-${cm}-${cd}`;
+dateInput.value=today;monthInput.value=`${cy}-${cm}`;
+function timeToMinutes(v){if(!v)return null;const p=v.split(":");if(p.length!==2)return null;const h=Number(p[0]),m=Number(p[1]);return Number.isNaN(h)||Number.isNaN(m)?null:h*60+m}
+function formatMinutes(m){m=Math.max(0,Math.round(Number(m)||0));return Math.floor(m/60)+":"+String(m%60).padStart(2,"0")}
+function calculateTime(){const s=timeToMinutes(startInput.value),e=timeToMinutes(endInput.value);if(s===null||e===null||e<=s){totalDisplay.textContent="0:00 Std.";breakDisplay.textContent="Pause: 0 Min.";return null}const gross=e-s;let pause=0;if(gross>540)pause=45;else if(gross>360)pause=30;const net=gross-pause;totalDisplay.textContent=formatMinutes(net)+" Std.";breakDisplay.textContent="Pause: "+pause+" Min.";return{gross,pause,net}}
+startInput.addEventListener("input",calculateTime);endInput.addEventListener("input",calculateTime);
+function resetForm(){editingId=null;customerInput.value="";startInput.value="";endInput.value="";dateInput.value=today;saveButton.textContent="Eintrag speichern";cancelEditButton.style.display="none";editNotice.style.display="none";calculateTime()}
+function editEntry(id){const e=entries.find(x=>x.id===id);if(!e)return;editingId=e.id;dateInput.value=e.date;customerInput.value=e.customer;startInput.value=e.start;endInput.value=e.end;calculateTime();saveButton.textContent="Änderungen speichern";cancelEditButton.style.display="block";editNotice.style.display="block";message.textContent="Eintrag geladen. Änderungen vornehmen und speichern.";window.scrollTo({top:0,behavior:"smooth"})}
+cancelEditButton.addEventListener("click",()=>{resetForm();message.textContent="Bearbeitung abgebrochen."});
+saveButton.addEventListener("click",()=>{message.textContent="";const c=calculateTime();if(!dateInput.value||!customerInput.value.trim()||!c){message.textContent="Bitte Datum, Kunde, Beginn und Ende vollständig eintragen.";return}
+if(editingId!==null){const i=entries.findIndex(x=>x.id===editingId);if(i===-1)return;entries[i]={...entries[i],date:dateInput.value,customer:customerInput.value.trim(),start:startInput.value,end:endInput.value,pause:c.pause,net:c.net};if(saveEntries()){monthInput.value=dateInput.value.slice(0,7);renderTable();resetForm();message.textContent="Änderungen dauerhaft gespeichert."}return}
+entries.push({id:Date.now().toString()+"-"+Math.random().toString(16).slice(2),date:dateInput.value,customer:customerInput.value.trim(),start:startInput.value,end:endInput.value,pause:c.pause,net:c.net});
+if(saveEntries()){monthInput.value=dateInput.value.slice(0,7);renderTable();resetForm();message.textContent="Eintrag dauerhaft gespeichert."}});
+function sortEntries(list){const type=sortBy.value,dir=sortDirection.value,a=[...list];a.sort((x,y)=>{let r=0;if(type==="date"){r=x.date.localeCompare(y.date);if(r===0)r=x.start.localeCompare(y.start)}else if(type==="start"){r=x.start.localeCompare(y.start);if(r===0)r=x.date.localeCompare(y.date)}else{r=x.customer.localeCompare(y.customer,"de",{sensitivity:"base"});if(r===0)r=x.date.localeCompare(y.date)}return dir==="desc"?-r:r});return a}
+function getMonthEntries(){return sortEntries(entries.filter(e=>e.date&&e.date.slice(0,7)===monthInput.value))}
+sortBy.addEventListener("change",()=>{saveSortSettings();renderTable()});sortDirection.addEventListener("change",()=>{saveSortSettings();renderTable()});monthInput.addEventListener("change",renderTable);
+function renderTable(){const list=getMonthEntries();tableBody.innerHTML="";let total=0;list.forEach(e=>{total+=Number(e.net)||0;const tr=document.createElement("tr"),vals=[e.date.split("-").reverse().join("."),e.customer,e.start,e.end,e.pause+" Min.",formatMinutes(e.net)+" Std."];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===5)td.className="time";tr.appendChild(td)});
+const ac=document.createElement("td"),box=document.createElement("div");box.className="actions";const eb=document.createElement("button");eb.type="button";eb.className="edit";eb.textContent="Bearbeiten";eb.onclick=()=>editEntry(e.id);const db=document.createElement("button");db.type="button";db.className="delete";db.textContent="Löschen";db.onclick=()=>{if(!confirm("Diesen Stundeneintrag wirklich löschen?"))return;entries=entries.filter(x=>x.id!==e.id);saveEntries();if(editingId===e.id)resetForm();renderTable();message.textContent="Eintrag gelöscht."};box.append(eb,db);ac.appendChild(box);tr.appendChild(ac);tableBody.appendChild(tr)});
+monthTotal.textContent=formatMinutes(total)+" Std.";emptyDisplay.style.display=list.length?"none":"block";pdfButton.disabled=!list.length}
+function escapeHTML(t){const d=document.createElement("div");d.textContent=String(t);return d.innerHTML}
+pdfButton.addEventListener("click",()=>{const list=getMonthEntries();if(!list.length)return;let total=0;const rows=list.map(e=>{total+=Number(e.net)||0;return `<tr><td>${e.date.split("-").reverse().join(".")}</td><td>${escapeHTML(e.customer)}</td><td>${e.start}</td><td>${e.end}</td><td>${e.pause} Min.</td><td class="right">${formatMinutes(e.net)} Std.</td></tr>`}).join("");
+const p=monthInput.value.split("-"),mt=p[1]+"."+p[0],sd=sortBy.value==="date"?"Datum":sortBy.value==="start"?"Beginn":"Kunde";
+const h=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Stundennachweis ${mt}</title><style>body{font-family:Arial,sans-serif;margin:35px;color:#111}h1{font-size:22px;margin-bottom:5px}.subtitle{color:#555;margin-top:0}.sortinfo{color:#777;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:25px;font-size:12px}th,td{border:1px solid #aaa;padding:8px;text-align:left}th{background:#eee}.right{text-align:right}.total{font-weight:bold;background:#eee}.signatures{display:flex;gap:70px;margin-top:70px}.signature{width:220px;border-top:1px solid #333;padding-top:5px;font-size:11px}@media print{body{margin:15mm}}</style></head><body><h1>Stundennachweis</h1><p class="subtitle">Monat ${mt}</p><p class="sortinfo">Sortierung: ${sd}</p><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="right">Arbeitszeit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total"><td colspan="5">Monatssumme</td><td class="right">${formatMinutes(total)} Std.</td></tr></tfoot></table><div class="signatures"><div class="signature">Mitarbeiterin</div><div class="signature">Arbeitgeber</div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
+const w=window.open("","_blank");if(!w){message.textContent="Die Druckansicht konnte nicht geöffnet werden.";return}w.document.open();w.document.write(h);w.document.close()});
+loadSortSettings();calculateTime();renderTable();
+</script>
+</body>
+</html>
