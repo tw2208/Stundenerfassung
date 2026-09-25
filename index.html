@@ -2,7 +2,8 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f6f1f3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Stundenerfassung</title>
@@ -27,6 +28,70 @@ th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}t
 td.time,th.time{text-align:right}tfoot td{font-weight:bold;background:#f5f5f5}.actions{display:flex;gap:5px}
 #empty{text-align:center;color:#777;padding:25px}
 @media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}.full{grid-column:auto}.calculation{align-items:flex-start;flex-direction:column}.control,.secondary{width:100%}.sort-row{flex-direction:column}}
+
+/* iPhone-Optimierung */
+html{-webkit-text-size-adjust:100%;background:#f6f1f3}
+body{
+  min-height:100vh;
+  min-height:100dvh;
+  padding-top:max(16px,env(safe-area-inset-top));
+  padding-right:max(14px,env(safe-area-inset-right));
+  padding-bottom:max(28px,env(safe-area-inset-bottom));
+  padding-left:max(14px,env(safe-area-inset-left));
+  -webkit-tap-highlight-color:transparent
+}
+input,select,button{-webkit-appearance:none;appearance:none}
+select{
+  background-image:linear-gradient(45deg,transparent 50%,#765b66 50%),linear-gradient(135deg,#765b66 50%,transparent 50%);
+  background-position:calc(100% - 18px) 20px,calc(100% - 13px) 20px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:36px
+}
+input[type="date"],input[type="time"],input[type="month"]{min-width:0}
+button:active{transform:scale(.985)}
+.mobile-list{display:none}
+.mobile-total{display:none}
+
+@media(max-width:600px){
+  body{padding-top:max(14px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .app{width:100%;max-width:none}
+  h1{font-size:26px;margin:4px 2px 16px}
+  .card{padding:15px;border-radius:18px;margin-bottom:12px}
+  .grid{grid-template-columns:1fr 1fr;gap:12px}
+  .grid .full{grid-column:1/-1}
+  label{font-size:13px;margin-bottom:5px}
+  input,select{min-height:50px;font-size:16px;border-radius:12px;padding:11px 12px}
+  button{min-height:50px;border-radius:12px;font-size:16px}
+  .calculation{flex-direction:row;align-items:center}
+  .big{font-size:28px}
+  .pause{font-size:13px;white-space:nowrap}
+  .hint{font-size:12px;line-height:1.35}
+  #message{margin:5px 2px;min-height:18px}
+  .primary{min-height:54px;font-size:17px}
+  .month-head{display:grid;grid-template-columns:1fr;gap:10px}
+  .month-head .control,.month-head .secondary{width:100%}
+  .sort-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:12px}
+  .sort-row .control{min-width:0}
+  .table-wrap{display:none}
+  .mobile-list{display:block;margin-top:14px}
+  .mobile-entry{background:#fff;border:1px solid #e5dadd;border-radius:15px;padding:13px;margin-bottom:10px;box-shadow:0 1px 5px rgba(80,55,65,.04)}
+  .mobile-entry-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px}
+  .mobile-date{font-size:13px;color:#786a70}
+  .mobile-customer{font-size:16px;font-weight:700;color:#4b3d43;margin-top:2px;overflow-wrap:anywhere}
+  .mobile-hours{font-size:18px;font-weight:700;color:#674f59;white-space:nowrap}
+  .mobile-details{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#f8f4f5;border-radius:10px;padding:9px;margin-bottom:9px}
+  .mobile-detail{font-size:12px;color:#71646a}
+  .mobile-detail strong{display:block;font-size:14px;color:#3f363a;margin-top:2px}
+  .mobile-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mobile-actions button{min-height:42px;font-size:13px}
+  .mobile-total{display:flex;justify-content:space-between;align-items:center;background:#765b66;color:white;border-radius:14px;padding:13px 14px;margin-top:12px;font-weight:700}
+  #empty{padding:18px 8px}
+}
+@media(max-width:370px){
+  .sort-row{grid-template-columns:1fr}
+  .calculation{align-items:flex-start;flex-direction:column}
+  .mobile-details{grid-template-columns:1fr 1fr 1fr}
+}
+
 </style>
 </head>
 <body>
@@ -61,11 +126,13 @@ td.time,th.time{text-align:right}tfoot td{font-weight:bold;background:#f5f5f5}.a
 </div>
 <div class="table-wrap"><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="time">Arbeitszeit</th><th>Aktion</th></tr></thead>
 <tbody id="tableBody"></tbody><tfoot><tr><td colspan="5">Monatssumme</td><td id="monthTotal" class="time">0:00 Std.</td><td></td></tr></tfoot></table></div>
+<div id="mobileList" class="mobile-list"></div>
+<div id="mobileTotal" class="mobile-total"><span>Monatssumme</span><span id="mobileMonthTotal">0:00 Std.</span></div>
 <div id="empty">Für diesen Monat sind noch keine Zeiten erfasst.</div>
 </div></div>
 <script>
 const STORAGE_KEY="allroundWeberStunden",SORT_STORAGE_KEY="allroundWeberStundenSortierung";
-const $=id=>document.getElementById(id),dateInput=$("date"),customerInput=$("customer"),startInput=$("start"),endInput=$("end"),totalDisplay=$("total"),breakDisplay=$("breakDisplay"),saveButton=$("save"),cancelEditButton=$("cancelEdit"),editNotice=$("editNotice"),monthInput=$("month"),pdfButton=$("pdf"),tableBody=$("tableBody"),monthTotal=$("monthTotal"),emptyDisplay=$("empty"),message=$("message"),sortBy=$("sortBy"),sortDirection=$("sortDirection"),customerSelect=$("customerSelect");
+const $=id=>document.getElementById(id),dateInput=$("date"),customerInput=$("customer"),startInput=$("start"),endInput=$("end"),totalDisplay=$("total"),breakDisplay=$("breakDisplay"),saveButton=$("save"),cancelEditButton=$("cancelEdit"),editNotice=$("editNotice"),monthInput=$("month"),pdfButton=$("pdf"),tableBody=$("tableBody"),monthTotal=$("monthTotal"),emptyDisplay=$("empty"),message=$("message"),sortBy=$("sortBy"),sortDirection=$("sortDirection"),customerSelect=$("customerSelect"),mobileList=$("mobileList"),mobileTotalBox=$("mobileTotal"),mobileMonthTotal=$("mobileMonthTotal");
 let editingId=null;
 function loadEntries(){try{const s=localStorage.getItem(STORAGE_KEY);if(!s)return[];const p=JSON.parse(s);return Array.isArray(p)?p:[]}catch(e){console.error(e);return[]}}
 let entries=loadEntries();
@@ -138,13 +205,113 @@ if(saveEntries()){monthInput.value=dateInput.value.slice(0,7);renderTable();rese
 function sortEntries(list){const type=sortBy.value,dir=sortDirection.value,a=[...list];a.sort((x,y)=>{let r=0;if(type==="date"){r=x.date.localeCompare(y.date);if(r===0)r=x.start.localeCompare(y.start)}else if(type==="start"){r=x.start.localeCompare(y.start);if(r===0)r=x.date.localeCompare(y.date)}else{r=x.customer.localeCompare(y.customer,"de",{sensitivity:"base"});if(r===0)r=x.date.localeCompare(y.date)}return dir==="desc"?-r:r});return a}
 function getMonthEntries(){return sortEntries(entries.filter(e=>e.date&&e.date.slice(0,7)===monthInput.value))}
 sortBy.addEventListener("change",()=>{saveSortSettings();renderTable()});sortDirection.addEventListener("change",()=>{saveSortSettings();renderTable()});monthInput.addEventListener("change",renderTable);
-function renderTable(){const list=getMonthEntries();tableBody.innerHTML="";let total=0;list.forEach(e=>{total+=Number(e.net)||0;const tr=document.createElement("tr"),vals=[e.date.split("-").reverse().join("."),e.customer,e.start,e.end,e.pause+" Min.",formatMinutes(e.net)+" Std."];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===5)td.className="time";tr.appendChild(td)});
-const ac=document.createElement("td"),box=document.createElement("div");box.className="actions";const eb=document.createElement("button");eb.type="button";eb.className="edit";eb.textContent="Bearbeiten";eb.onclick=()=>editEntry(e.id);const db=document.createElement("button");db.type="button";db.className="delete";db.textContent="Löschen";db.onclick=()=>{if(!confirm("Diesen Stundeneintrag wirklich löschen?"))return;entries=entries.filter(x=>x.id!==e.id);saveEntries();if(editingId===e.id)resetForm();renderTable();message.textContent="Eintrag gelöscht."};box.append(eb,db);ac.appendChild(box);tr.appendChild(ac);tableBody.appendChild(tr)});
-monthTotal.textContent=formatMinutes(total)+" Std.";emptyDisplay.style.display=list.length?"none":"block";pdfButton.disabled=!list.length}
+function renderTable(){
+const list=getMonthEntries();tableBody.innerHTML="";mobileList.innerHTML="";let total=0;
+list.forEach(e=>{
+  total+=Number(e.net)||0;
+  const tr=document.createElement("tr"),vals=[e.date.split("-").reverse().join("."),e.customer,e.start,e.end,e.pause+" Min.",formatMinutes(e.net)+" Std."];
+  vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===5)td.className="time";tr.appendChild(td)});
+  const ac=document.createElement("td"),box=document.createElement("div");box.className="actions";
+  const eb=document.createElement("button");eb.type="button";eb.className="edit";eb.textContent="Bearbeiten";eb.onclick=()=>editEntry(e.id);
+  const db=document.createElement("button");db.type="button";db.className="delete";db.textContent="Löschen";db.onclick=()=>deleteEntry(e.id);
+  box.append(eb,db);ac.appendChild(box);tr.appendChild(ac);tableBody.appendChild(tr);
+
+  const card=document.createElement("div");card.className="mobile-entry";
+  const top=document.createElement("div");top.className="mobile-entry-top";
+  const left=document.createElement("div");
+  const d=document.createElement("div");d.className="mobile-date";d.textContent=e.date.split("-").reverse().join(".");
+  const c=document.createElement("div");c.className="mobile-customer";c.textContent=e.customer;
+  left.append(d,c);
+  const hrs=document.createElement("div");hrs.className="mobile-hours";hrs.textContent=formatMinutes(e.net)+" Std.";
+  top.append(left,hrs);
+
+  const details=document.createElement("div");details.className="mobile-details";
+  [["Beginn",e.start],["Ende",e.end],["Pause",e.pause+" Min."]].forEach(([label,value])=>{
+    const item=document.createElement("div");item.className="mobile-detail";item.textContent=label;
+    const strong=document.createElement("strong");strong.textContent=value;item.appendChild(strong);details.appendChild(item);
+  });
+  const actions=document.createElement("div");actions.className="mobile-actions";
+  const me=document.createElement("button");me.type="button";me.className="edit";me.textContent="Bearbeiten";me.onclick=()=>editEntry(e.id);
+  const md=document.createElement("button");md.type="button";md.className="delete";md.textContent="Löschen";md.onclick=()=>deleteEntry(e.id);
+  actions.append(me,md);card.append(top,details,actions);mobileList.appendChild(card);
+});
+monthTotal.textContent=formatMinutes(total)+" Std.";
+mobileMonthTotal.textContent=formatMinutes(total)+" Std.";
+mobileTotalBox.style.display=list.length?"":"none";
+emptyDisplay.style.display=list.length?"none":"block";pdfButton.disabled=!list.length
+}
+function deleteEntry(id){
+  if(!confirm("Diesen Stundeneintrag wirklich löschen?"))return;
+  entries=entries.filter(x=>x.id!==id);saveEntries();if(editingId===id)resetForm();renderTable();message.textContent="Eintrag gelöscht.";
+}
 function escapeHTML(t){const d=document.createElement("div");d.textContent=String(t);return d.innerHTML}
 pdfButton.addEventListener("click",()=>{const list=getMonthEntries();if(!list.length)return;let total=0;const rows=list.map(e=>{total+=Number(e.net)||0;return `<tr><td>${e.date.split("-").reverse().join(".")}</td><td>${escapeHTML(e.customer)}</td><td>${e.start}</td><td>${e.end}</td><td>${e.pause} Min.</td><td class="right">${formatMinutes(e.net)} Std.</td></tr>`}).join("");
 const p=monthInput.value.split("-"),mt=p[1]+"."+p[0],sd=sortBy.value==="date"?"Datum":sortBy.value==="start"?"Beginn":"Kunde";
-const h=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Stundennachweis ${mt}</title><style>body{font-family:Arial,sans-serif;margin:35px;color:#111}h1{font-size:22px;margin-bottom:5px}.subtitle{color:#555;margin-top:0}.sortinfo{color:#777;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:25px;font-size:12px}th,td{border:1px solid #aaa;padding:8px;text-align:left}th{background:#eee}.right{text-align:right}.total{font-weight:bold;background:#eee}.signatures{display:flex;gap:70px;margin-top:70px}.signature{width:220px;border-top:1px solid #333;padding-top:5px;font-size:11px}@media print{body{margin:15mm}}</style></head><body><h1>Stundennachweis</h1><p class="subtitle">Monat ${mt}</p><p class="sortinfo">Sortierung: ${sd}</p><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="right">Arbeitszeit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total"><td colspan="5">Monatssumme</td><td class="right">${formatMinutes(total)} Std.</td></tr></tfoot></table><div class="signatures"><div class="signature">Mitarbeiterin</div><div class="signature">Arbeitgeber</div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
+const h=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Stundennachweis ${mt}</title><style>body{font-family:Arial,sans-serif;margin:35px;color:#111}h1{font-size:22px;margin-bottom:5px}.subtitle{color:#555;margin-top:0}.sortinfo{color:#777;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:25px;font-size:12px}th,td{border:1px solid #aaa;padding:8px;text-align:left}th{background:#eee}.right{text-align:right}.total{font-weight:bold;background:#eee}.signatures{display:flex;gap:70px;margin-top:70px}.signature{width:220px;border-top:1px solid #333;padding-top:5px;font-size:11px}@media print{body{margin:15mm}}
+/* iPhone-Optimierung */
+html{-webkit-text-size-adjust:100%;background:#f6f1f3}
+body{
+  min-height:100vh;
+  min-height:100dvh;
+  padding-top:max(16px,env(safe-area-inset-top));
+  padding-right:max(14px,env(safe-area-inset-right));
+  padding-bottom:max(28px,env(safe-area-inset-bottom));
+  padding-left:max(14px,env(safe-area-inset-left));
+  -webkit-tap-highlight-color:transparent
+}
+input,select,button{-webkit-appearance:none;appearance:none}
+select{
+  background-image:linear-gradient(45deg,transparent 50%,#765b66 50%),linear-gradient(135deg,#765b66 50%,transparent 50%);
+  background-position:calc(100% - 18px) 20px,calc(100% - 13px) 20px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:36px
+}
+input[type="date"],input[type="time"],input[type="month"]{min-width:0}
+button:active{transform:scale(.985)}
+.mobile-list{display:none}
+.mobile-total{display:none}
+
+@media(max-width:600px){
+  body{padding-top:max(14px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .app{width:100%;max-width:none}
+  h1{font-size:26px;margin:4px 2px 16px}
+  .card{padding:15px;border-radius:18px;margin-bottom:12px}
+  .grid{grid-template-columns:1fr 1fr;gap:12px}
+  .grid .full{grid-column:1/-1}
+  label{font-size:13px;margin-bottom:5px}
+  input,select{min-height:50px;font-size:16px;border-radius:12px;padding:11px 12px}
+  button{min-height:50px;border-radius:12px;font-size:16px}
+  .calculation{flex-direction:row;align-items:center}
+  .big{font-size:28px}
+  .pause{font-size:13px;white-space:nowrap}
+  .hint{font-size:12px;line-height:1.35}
+  #message{margin:5px 2px;min-height:18px}
+  .primary{min-height:54px;font-size:17px}
+  .month-head{display:grid;grid-template-columns:1fr;gap:10px}
+  .month-head .control,.month-head .secondary{width:100%}
+  .sort-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:12px}
+  .sort-row .control{min-width:0}
+  .table-wrap{display:none}
+  .mobile-list{display:block;margin-top:14px}
+  .mobile-entry{background:#fff;border:1px solid #e5dadd;border-radius:15px;padding:13px;margin-bottom:10px;box-shadow:0 1px 5px rgba(80,55,65,.04)}
+  .mobile-entry-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px}
+  .mobile-date{font-size:13px;color:#786a70}
+  .mobile-customer{font-size:16px;font-weight:700;color:#4b3d43;margin-top:2px;overflow-wrap:anywhere}
+  .mobile-hours{font-size:18px;font-weight:700;color:#674f59;white-space:nowrap}
+  .mobile-details{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#f8f4f5;border-radius:10px;padding:9px;margin-bottom:9px}
+  .mobile-detail{font-size:12px;color:#71646a}
+  .mobile-detail strong{display:block;font-size:14px;color:#3f363a;margin-top:2px}
+  .mobile-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mobile-actions button{min-height:42px;font-size:13px}
+  .mobile-total{display:flex;justify-content:space-between;align-items:center;background:#765b66;color:white;border-radius:14px;padding:13px 14px;margin-top:12px;font-weight:700}
+  #empty{padding:18px 8px}
+}
+@media(max-width:370px){
+  .sort-row{grid-template-columns:1fr}
+  .calculation{align-items:flex-start;flex-direction:column}
+  .mobile-details{grid-template-columns:1fr 1fr 1fr}
+}
+
+</style></head><body><h1>Stundennachweis</h1><p class="subtitle">Monat ${mt}</p><p class="sortinfo">Sortierung: ${sd}</p><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="right">Arbeitszeit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total"><td colspan="5">Monatssumme</td><td class="right">${formatMinutes(total)} Std.</td></tr></tfoot></table><div class="signatures"><div class="signature">Mitarbeiterin</div><div class="signature">Arbeitgeber</div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
 const w=window.open("","_blank");if(!w){message.textContent="Die Druckansicht konnte nicht geöffnet werden.";return}w.document.open();w.document.write(h);w.document.close()});
 loadSortSettings();renderCustomerList();calculateTime();renderTable();
 </script>
