@@ -36,9 +36,14 @@ td.time,th.time{text-align:right}tfoot td{font-weight:bold;background:#f5f5f5}.a
 <div id="editNotice" class="editNotice">Eintrag wird bearbeitet</div>
 <div class="grid">
 <div class="full"><label for="date">Datum</label><input id="date" type="date"></div>
-<div class="full"><label for="customer">Kunde</label>
-<input id="customer" type="text" list="customerList" placeholder="Kunde auswählen oder neu eingeben" autocomplete="off">
-<datalist id="customerList"></datalist></div>
+<div class="full">
+<label for="customerSelect">Kunde</label>
+<select id="customerSelect">
+  <option value="">Kunde auswählen</option>
+  <option value="__new__">+ Neuen Kunden eingeben</option>
+</select>
+<input id="customer" type="text" placeholder="Neuen Kunden eingeben" autocomplete="off" style="display:none;margin-top:8px">
+</div>
 <div><label for="start">Beginn</label><input id="start" type="time"></div>
 <div><label for="end">Ende</label><input id="end" type="time"></div>
 </div></div>
@@ -60,20 +65,49 @@ td.time,th.time{text-align:right}tfoot td{font-weight:bold;background:#f5f5f5}.a
 </div></div>
 <script>
 const STORAGE_KEY="allroundWeberStunden",SORT_STORAGE_KEY="allroundWeberStundenSortierung";
-const $=id=>document.getElementById(id),dateInput=$("date"),customerInput=$("customer"),startInput=$("start"),endInput=$("end"),totalDisplay=$("total"),breakDisplay=$("breakDisplay"),saveButton=$("save"),cancelEditButton=$("cancelEdit"),editNotice=$("editNotice"),monthInput=$("month"),pdfButton=$("pdf"),tableBody=$("tableBody"),monthTotal=$("monthTotal"),emptyDisplay=$("empty"),message=$("message"),sortBy=$("sortBy"),sortDirection=$("sortDirection"),customerList=$("customerList");
+const $=id=>document.getElementById(id),dateInput=$("date"),customerInput=$("customer"),startInput=$("start"),endInput=$("end"),totalDisplay=$("total"),breakDisplay=$("breakDisplay"),saveButton=$("save"),cancelEditButton=$("cancelEdit"),editNotice=$("editNotice"),monthInput=$("month"),pdfButton=$("pdf"),tableBody=$("tableBody"),monthTotal=$("monthTotal"),emptyDisplay=$("empty"),message=$("message"),sortBy=$("sortBy"),sortDirection=$("sortDirection"),customerSelect=$("customerSelect");
 let editingId=null;
 function loadEntries(){try{const s=localStorage.getItem(STORAGE_KEY);if(!s)return[];const p=JSON.parse(s);return Array.isArray(p)?p:[]}catch(e){console.error(e);return[]}}
 let entries=loadEntries();
-function renderCustomerList(){
+function renderCustomerList(selectedValue=""){
   const customers=[...new Set(entries.map(e=>(e.customer||"").trim()).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,"de",{sensitivity:"base"}));
-  customerList.innerHTML="";
+  customerSelect.innerHTML="";
+  const empty=document.createElement("option");
+  empty.value="";
+  empty.textContent="Kunde auswählen";
+  customerSelect.appendChild(empty);
   customers.forEach(name=>{
     const option=document.createElement("option");
     option.value=name;
-    customerList.appendChild(option);
+    option.textContent=name;
+    customerSelect.appendChild(option);
   });
+  const add=document.createElement("option");
+  add.value="__new__";
+  add.textContent="+ Neuen Kunden eingeben";
+  customerSelect.appendChild(add);
+  if(selectedValue && customers.includes(selectedValue)){
+    customerSelect.value=selectedValue;
+    customerInput.value=selectedValue;
+    customerInput.style.display="none";
+  } else {
+    customerSelect.value="";
+  }
 }
+customerSelect.addEventListener("change",()=>{
+  if(customerSelect.value==="__new__"){
+    customerInput.value="";
+    customerInput.style.display="block";
+    customerInput.focus();
+  } else if(customerSelect.value){
+    customerInput.value=customerSelect.value;
+    customerInput.style.display="none";
+  } else {
+    customerInput.value="";
+    customerInput.style.display="none";
+  }
+});
 function saveEntries(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(entries));renderCustomerList();return true}catch(e){message.textContent="Die Daten konnten nicht gespeichert werden.";return false}}
 function saveSortSettings(){try{localStorage.setItem(SORT_STORAGE_KEY,JSON.stringify({sortBy:sortBy.value,direction:sortDirection.value}))}catch(e){}}
 function loadSortSettings(){try{const s=localStorage.getItem(SORT_STORAGE_KEY);if(!s)return;const x=JSON.parse(s);if(["date","start","customer"].includes(x.sortBy))sortBy.value=x.sortBy;if(["asc","desc"].includes(x.direction))sortDirection.value=x.direction}catch(e){}}
@@ -83,8 +117,19 @@ function timeToMinutes(v){if(!v)return null;const p=v.split(":");if(p.length!==2
 function formatMinutes(m){m=Math.max(0,Math.round(Number(m)||0));return Math.floor(m/60)+":"+String(m%60).padStart(2,"0")}
 function calculateTime(){const s=timeToMinutes(startInput.value),e=timeToMinutes(endInput.value);if(s===null||e===null||e<=s){totalDisplay.textContent="0:00 Std.";breakDisplay.textContent="Pause: 0 Min.";return null}const gross=e-s;let pause=0;if(gross>540)pause=45;else if(gross>360)pause=30;const net=gross-pause;totalDisplay.textContent=formatMinutes(net)+" Std.";breakDisplay.textContent="Pause: "+pause+" Min.";return{gross,pause,net}}
 startInput.addEventListener("input",calculateTime);endInput.addEventListener("input",calculateTime);
-function resetForm(){editingId=null;customerInput.value="";startInput.value="09:00";endInput.value="15:00";dateInput.value=today;saveButton.textContent="Eintrag speichern";cancelEditButton.style.display="none";editNotice.style.display="none";calculateTime()}
-function editEntry(id){const e=entries.find(x=>x.id===id);if(!e)return;editingId=e.id;dateInput.value=e.date;customerInput.value=e.customer;startInput.value=e.start;endInput.value=e.end;calculateTime();saveButton.textContent="Änderungen speichern";cancelEditButton.style.display="block";editNotice.style.display="block";message.textContent="Eintrag geladen. Änderungen vornehmen und speichern.";window.scrollTo({top:0,behavior:"smooth"})}
+function resetForm(){editingId=null;customerInput.value="";customerInput.style.display="none";customerSelect.value="";startInput.value="09:00";endInput.value="15:00";dateInput.value=today;saveButton.textContent="Eintrag speichern";cancelEditButton.style.display="none";editNotice.style.display="none";calculateTime()}
+function editEntry(id){const e=entries.find(x=>x.id===id);if(!e)return;editingId=e.id;dateInput.value=e.date;
+renderCustomerList(e.customer);
+if([...customerSelect.options].some(o=>o.value===e.customer)){
+  customerSelect.value=e.customer;
+  customerInput.value=e.customer;
+  customerInput.style.display="none";
+}else{
+  customerSelect.value="__new__";
+  customerInput.value=e.customer;
+  customerInput.style.display="block";
+}
+startInput.value=e.start;endInput.value=e.end;calculateTime();saveButton.textContent="Änderungen speichern";cancelEditButton.style.display="block";editNotice.style.display="block";message.textContent="Eintrag geladen. Änderungen vornehmen und speichern.";window.scrollTo({top:0,behavior:"smooth"})}
 cancelEditButton.addEventListener("click",()=>{resetForm();message.textContent="Bearbeitung abgebrochen."});
 saveButton.addEventListener("click",()=>{message.textContent="";const c=calculateTime();if(!dateInput.value||!customerInput.value.trim()||!c){message.textContent="Bitte Datum, Kunde, Beginn und Ende vollständig eintragen.";return}
 if(editingId!==null){const i=entries.findIndex(x=>x.id===editingId);if(i===-1)return;entries[i]={...entries[i],date:dateInput.value,customer:customerInput.value.trim(),start:startInput.value,end:endInput.value,pause:c.pause,net:c.net};if(saveEntries()){monthInput.value=dateInput.value.slice(0,7);renderTable();resetForm();message.textContent="Änderungen dauerhaft gespeichert."}return}
