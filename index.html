@@ -58,6 +58,7 @@ th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}th
 }
 #printArea{display:none}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -142,15 +143,36 @@ function renderTable(){
 }
 function deleteEntry(id){if(!confirm("Diesen Stundeneintrag wirklich löschen?"))return;entries=entries.filter(x=>x.id!==id);saveEntries();if(editingId===id)resetForm();renderTable();message.textContent="Eintrag gelöscht."}
 function escapeHTML(t){const d=document.createElement("div");d.textContent=String(t);return d.innerHTML}
-pdfButton.addEventListener("click",()=>{
- const list=getMonthEntries();if(!list.length)return;let total=0;
+pdfButton.addEventListener("click",async()=>{
+ message.textContent="";
+ const list=getMonthEntries();
+ if(!list.length){message.textContent="Für den ausgewählten Monat gibt es keine Einträge zum Exportieren.";return}
+ if(typeof html2pdf==="undefined"){message.textContent="Der PDF-Dienst konnte nicht geladen werden. Bitte Internetverbindung prüfen und erneut versuchen.";return}
+ let total=0;
  const rows=list.map(e=>{total+=Number(e.net)||0;return `<tr><td>${e.date.split("-").reverse().join(".")}</td><td>${escapeHTML(e.customer)}</td><td>${escapeHTML(e.start)}</td><td>${escapeHTML(e.end)}</td><td>${Number(e.pause)||0} Min.</td><td class="right">${formatMinutes(e.net)} Std.</td></tr>`}).join("");
  const p=monthInput.value.split("-"),mt=p[1]+"."+p[0],sd=sortBy.value==="date"?"Datum":sortBy.value==="start"?"Beginn":"Kunde";
- $("printArea").innerHTML=`<h1>Stundennachweis</h1><p>Monat ${mt}</p><p style="font-size:11px;color:#555">Sortierung: ${sd}</p><table><thead><tr><th>Datum</th><th>Kunde</th><th>Beginn</th><th>Ende</th><th>Pause</th><th class="right">Arbeitszeit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total"><td colspan="5">Monatssumme</td><td class="right">${formatMinutes(total)} Std.</td></tr></tfoot></table><div class="signatures"><div class="signature">Mitarbeiterin</div><div class="signature">Arbeitgeber</div></div>`;
- // Druckdialog im selben Fenster öffnen. Auf iOS anschließend in der Druckvorschau
- // die Vorschau mit zwei Fingern vergrößern und über das Teilen-Symbol sichern/teilen.
- window.print();
-});
+ const area=$("printArea");
+ area.innerHTML=`<div style="font-family:Arial,sans-serif;color:#111;padding:20px;background:white"><h1 style="font-size:22px;margin:0 0 8px">Stundennachweis</h1><p>Monat ${mt}</p><p style="font-size:11px;color:#555">Sortierung: ${sd}</p><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>${["Datum","Kunde","Beginn","Ende","Pause","Arbeitszeit"].map(x=>`<th style="border:1px solid #888;padding:7px;text-align:left;background:#eee">${x}</th>`).join("")}</tr></thead><tbody>${rows.replace(/<td>/g,'<td style="border:1px solid #aaa;padding:7px">').replace(/class="right"/g,'style="border:1px solid #aaa;padding:7px;text-align:right"')}</tbody><tfoot><tr><td colspan="5" style="border:1px solid #888;padding:7px;font-weight:bold">Monatssumme</td><td style="border:1px solid #888;padding:7px;text-align:right;font-weight:bold">${formatMinutes(total)} Std.</td></tr></tfoot></table><div style="display:flex;gap:50px;margin-top:65px"><div style="border-top:1px solid #333;width:45%;padding-top:8px;font-size:11px">Mitarbeiterin</div><div style="border-top:1px solid #333;width:45%;padding-top:8px;font-size:11px">Arbeitgeber</div></div></div>`;
+ const filename=`Stundennachweis-${p[1]}-${p[0]}.pdf`;
+ pdfButton.disabled=true;pdfButton.textContent="PDF wird erstellt …";
+ try{
+  const blob=await html2pdf().set({margin:8,filename,image:{type:"jpeg",quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"landscape"}}).from(area).outputPdf("blob");
+  const file=new File([blob],filename,{type:"application/pdf"});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:"Stundennachweis"});
+   message.textContent="PDF wurde zum Teilen bereitgestellt. Du kannst es dort in „Dateien“ sichern.";
+  }else{
+   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),60000);
+   message.textContent="PDF wurde erstellt. Bitte im Download- bzw. Teilen-Menü sichern.";
+  }
+ }catch(err){
+  console.error("PDF-Export fehlgeschlagen:",err);
+  message.textContent="PDF konnte nicht erstellt werden. Bitte Internetverbindung prüfen und erneut versuchen.";
+ }finally{
+  pdfButton.disabled=false;pdfButton.textContent="PDF exportieren";
+ }
+});;
 const backupExportButton=$("backupExport"),backupImportButton=$("backupImport"),backupFileInput=$("backupFile");
 backupExportButton.addEventListener("click",async()=>{
  try{
