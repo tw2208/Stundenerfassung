@@ -78,6 +78,7 @@ th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}th
 <button id="cancelEdit" type="button">Bearbeiten abbrechen</button>
 <section class="card" style="margin-top:24px">
 <div class="month-head"><div class="control"><label for="month">Monatsübersicht</label><input id="month" type="month"></div><button id="pdf" class="secondary" type="button">PDF exportieren</button></div>
+<div id="pdfActions" hidden style="margin-top:14px"><button id="pdfShare" class="primary" type="button">PDF speichern / teilen</button><button id="pdfDownload" class="secondary" type="button" style="margin-top:8px">PDF herunterladen</button><p class="hint" id="pdfStatus" role="status"></p></div>
 <div class="sort-row">
 <div class="control"><label for="sortBy">Sortieren nach</label><select id="sortBy"><option value="date">Datum</option><option value="start">Beginn</option><option value="customer">Kunde</option></select></div>
 <div class="control"><label for="sortDirection">Reihenfolge</label><select id="sortDirection"><option value="asc">Aufsteigend</option><option value="desc">Absteigend</option></select></div>
@@ -132,6 +133,7 @@ function sortEntries(list){const type=sortBy.value,dir=sortDirection.value,a=[..
 function getMonthEntries(){return sortEntries(entries.filter(e=>e.date&&e.date.slice(0,7)===monthInput.value))}
 sortBy.addEventListener("change",()=>{saveSortSettings();renderTable()});sortDirection.addEventListener("change",()=>{saveSortSettings();renderTable()});monthInput.addEventListener("change",renderTable);
 function renderTable(){
+ clearPdf();
  const list=getMonthEntries();tableBody.innerHTML="";mobileList.innerHTML="";let total=0;
  list.forEach(e=>{total+=Number(e.net)||0;const tr=document.createElement("tr"),vals=[e.date.split("-").reverse().join("."),e.customer,e.start,e.end,e.pause+" Min.",formatMinutes(e.net)+" Std."];vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===5)td.className="time";tr.appendChild(td)});
  const ac=document.createElement("td"),box=document.createElement("div");box.className="actions";const eb=document.createElement("button");eb.type="button";eb.className="edit";eb.textContent="Bearbeiten";eb.onclick=()=>editEntry(e.id);const db=document.createElement("button");db.type="button";db.className="delete";db.textContent="Löschen";db.onclick=()=>deleteEntry(e.id);box.append(eb,db);ac.appendChild(box);tr.appendChild(ac);tableBody.appendChild(tr);
@@ -143,7 +145,22 @@ function renderTable(){
 }
 function deleteEntry(id){if(!confirm("Diesen Stundeneintrag wirklich löschen?"))return;entries=entries.filter(x=>x.id!==id);saveEntries();if(editingId===id)resetForm();renderTable();message.textContent="Eintrag gelöscht."}
 function escapeHTML(t){const d=document.createElement("div");d.textContent=String(t);return d.innerHTML}
+let readyPdf=null,readyPdfUrl=null;
+const pdfActions=$("pdfActions"),pdfStatus=$("pdfStatus");
+function clearPdf(){readyPdf=null;if(readyPdfUrl)URL.revokeObjectURL(readyPdfUrl);readyPdfUrl=null;pdfActions.hidden=true}
+function downloadPdf(){if(!readyPdf)return;const a=document.createElement("a");a.href=readyPdfUrl;a.download=readyPdf.name;document.body.appendChild(a);a.click();a.remove();pdfStatus.textContent="Download angefordert. Auf dem iPhone bitte bevorzugt „PDF speichern / teilen“ verwenden."}
+$("pdfDownload").addEventListener("click",downloadPdf);
+$("pdfShare").addEventListener("click",async()=>{
+ if(!readyPdf)return;
+ try{
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[readyPdf]})){
+   await navigator.share({files:[readyPdf],title:"Stundennachweis"});
+   pdfStatus.textContent="Teilen-Menü geschlossen. Wenn du „In Dateien sichern“ gewählt hast, findest du die PDF dort.";
+  }else{downloadPdf()}
+ }catch(err){pdfStatus.textContent=err.name==="AbortError"?"Teilen abgebrochen. Du kannst es erneut versuchen.":"Teilen nicht möglich. Bitte „PDF herunterladen“ versuchen."}
+});
 pdfButton.addEventListener("click",async()=>{
+ clearPdf();
  message.textContent="";
  const list=getMonthEntries();
  if(!list.length){message.textContent="Für den ausgewählten Monat gibt es keine Einträge zum Exportieren.";return}
@@ -156,16 +173,14 @@ pdfButton.addEventListener("click",async()=>{
  const filename=`Stundennachweis-${p[1]}-${p[0]}.pdf`;
  pdfButton.disabled=true;pdfButton.textContent="PDF wird erstellt …";
  try{
-  const blob=await html2pdf().set({margin:8,filename,image:{type:"jpeg",quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"landscape"}}).from(area).outputPdf("blob");
-  const file=new File([blob],filename,{type:"application/pdf"});
-  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-   await navigator.share({files:[file],title:"Stundennachweis"});
-   message.textContent="PDF wurde zum Teilen bereitgestellt. Du kannst es dort in „Dateien“ sichern.";
-  }else{
-   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-   setTimeout(()=>URL.revokeObjectURL(url),60000);
-   message.textContent="PDF wurde erstellt. Bitte im Download- bzw. Teilen-Menü sichern.";
-  }
+  const blob=await html2pdf().set({margin:8,filename,image:{type:"jpeg",quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff",onclone:doc=>{const a=doc.getElementById("printArea");a.style.display="block";a.style.width="1060px";a.style.background="white"}},pagebreak:{mode:["css","legacy"],avoid:["tr"]},jsPDF:{unit:"mm",format:"a4",orientation:"landscape"}}).from(area).outputPdf("blob");
+  readyPdf=new File([blob],filename,{type:"application/pdf"});
+  readyPdfUrl=URL.createObjectURL(blob);
+  pdfActions.hidden=false;
+  pdfStatus.textContent="PDF ist bereit. Tippe auf „PDF speichern / teilen“ und wähle „In Dateien sichern“.";
+  message.textContent="PDF erstellt – jetzt speichern / teilen.";
+  $("pdfShare").focus();
+
  }catch(err){
   console.error("PDF-Export fehlgeschlagen:",err);
   message.textContent="PDF konnte nicht erstellt werden. Bitte Internetverbindung prüfen und erneut versuchen.";
